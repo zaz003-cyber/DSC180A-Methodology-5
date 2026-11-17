@@ -1,0 +1,34 @@
+name: Publish MA5 image
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish.yml', 'Dockerfile']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: ghcr.io/zaz003-cyber/dsc180a-methodology-5:latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Build and verify the image
+        run: |
+          docker build --platform linux/amd64 --tag "$IMAGE" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" .
+          docker run --rm "$IMAGE" bash -ec 'command -v aria2c nmap traceroute'
+          docker run --rm "$IMAGE" python -c 'from importlib.metadata import version; import babypandas, geopandas; assert version("babypandas") == "0.1.5"'
+      - name: Push to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE"
